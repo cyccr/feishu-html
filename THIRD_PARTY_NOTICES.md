@@ -8,6 +8,7 @@
 | [feishu-docx](https://github.com/longbridge/feishu-pages/tree/main/feishu-docx) | 0.7.0 | Copyright (c) 2023 Longbridge Inc.，MIT |
 | [VitePress](https://github.com/vuejs/vitepress) | 1.6.4 | Copyright (c) 2019-present, Yuxi (Evan) You，MIT |
 | [gray-matter](https://github.com/jonschlinkert/gray-matter) | 4.0.3 | Copyright (c) 2014-2018, Jon Schlinkert，MIT |
+| [parse5](https://github.com/inikulin/parse5) | 7.3.0 | Copyright (c) 2013-2019 Ivan Nikulin，MIT |
 
 `feishu-code-preload.cjs` 为 Feishu Pages 使用的渲染器提供适配。下方保留其上游许可。其他依赖及 VitePress 随附组件的许可和声明以各软件包内的文件为准。
 

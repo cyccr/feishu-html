@@ -2,8 +2,10 @@ import { defineConfig } from 'vitepress';
 import fs from 'node:fs';
 import { createShareHead, ICON_VERSION, SITE_NAME } from './share-metadata.mjs';
 import { preserveCodeWhitespace } from './code-whitespace.mjs';
+import { installFeishuLinks } from './feishu-links.mjs';
 
 const docs = JSON.parse(fs.readFileSync(new URL('./sidebar.json', import.meta.url), 'utf8'));
+const links = JSON.parse(fs.readFileSync(new URL('./feishu-links.json', import.meta.url), 'utf8'));
 const origin = new URL(process.env.SITE_URL || 'http://localhost:4173').origin;
 
 function sidebarItems(items) {
@@ -32,7 +34,12 @@ export default defineConfig({
   title: SITE_NAME,
   description: '公开指南、使用说明与常见问题。',
   cleanUrls: false,
-  markdown: { config: preserveCodeWhitespace },
+  markdown: {
+    config(md) {
+      preserveCodeWhitespace(md);
+      installFeishuLinks(md, links);
+    },
+  },
   lastUpdated: false,
   sitemap: { hostname: origin },
   head: [

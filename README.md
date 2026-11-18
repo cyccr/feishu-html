@@ -46,6 +46,8 @@ npm run preview
 
 页首 YAML 默认作为代码示例展示。若要设置页面元数据，请在首个顶层 YAML 代码块的第一行写 `# feishu-page-meta`。项目使用 Feishu Pages 获取文档块，补全工作表与独立文件，再由 VitePress 输出 HTML。文章地址采用 `/articles/节点标识.html`。
 
+同一发布范围内的飞书文章链接会保留查询参数和章节定位。一级至六级标题同时保留飞书块标识和网页标题锚点，重名章节也可以分别定位。代码示例里的链接保持原文，复制按钮会保留 Shell 提示符、缩进和末尾空白。
+
 ## 版本与反馈
 
 首个公开版本为 **v1.0.0**。[版本记录](CHANGELOG.md) · [提交问题](https://github.com/cyccr/feishu-html/issues) · [MIT 许可证](LICENSE) · [第三方声明](THIRD_PARTY_NOTICES.md)

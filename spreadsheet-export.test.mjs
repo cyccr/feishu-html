@@ -140,6 +140,19 @@ test('embedded worksheets publish at their original positions with rich text, es
   assert.match(fs.readFileSync(path.join(output, 'articles', 'article.md'), 'utf8'), /蓝牙设备/);
 });
 
+test('sheet expansion leaves marker examples inside code untouched', async t => {
+  const { exported, document, requests, environment } = embeddedFixture(t);
+  const marker = 'feishu-embedded-sheet-test-run';
+  const literal = '<!-- feishu-embedded-sheet:unknown_tab -->';
+  fs.writeFileSync(document, ['```html', literal, '```', '', `<!-- ${marker}:workbook_first -->`].join('\n'));
+  await completeExport(exported, { mode: 'space' }, { ...environment, FEISHU_SHEET_MARKER: marker });
+  const body = fs.readFileSync(document, 'utf8');
+  assert.ok(body.includes('```html\n' + literal + '\n```'));
+  assert.ok(body.includes('<table v-pre>'));
+  assert.ok(!body.includes(marker));
+  assert.ok(requests.every(url => !url.pathname.includes('unknown')));
+});
+
 test('embedded sheet values are read again on the next export so changes enter publication content', async t => {
   const options = { currentValue: '旧版' };
   const { exported, document, markdown, environment } = embeddedFixture(t, options);

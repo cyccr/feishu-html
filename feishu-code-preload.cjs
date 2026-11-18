@@ -2,6 +2,9 @@ const { createRequire } = require('node:module');
 
 // Patch the renderer instance used by the pinned feishu-pages exporter.
 const requireExporter = createRequire(require.resolve('feishu-pages'));
+// The CLI searches the entire Markdown string, including code. Resolve actual
+// links at build time when the complete Wiki tree and downloaded assets exist.
+requireExporter('./utils').replaceLinks = content => content;
 const { MarkdownRenderer } = requireExporter('feishu-docx/dist/markdown_renderer');
 const { BlockType, CodeLanguage, getCodeLanguage } = requireExporter('feishu-docx/dist/types');
 const yaml = requireExporter('js-yaml');
@@ -19,7 +22,17 @@ MarkdownRenderer.prototype.parseTextBlock = function (block, textBlock) {
 };
 
 MarkdownRenderer.prototype.parseBlock = function (block, indent) {
-  if (block?.block_type !== BlockType.Code) return renderBlock.call(this, block, indent);
+  if (block?.block_type !== BlockType.Code) {
+    const markdown = renderBlock.call(this, block, indent);
+    if (block && block.block_type >= BlockType.Heading1 && block.block_type <= BlockType.Heading6 &&
+        typeof block.block_id === 'string' && /^[A-Za-z0-9_-]+$/.test(block.block_id)) {
+      // Keep VitePress's title-based ID for existing bookmarks, alongside the
+      // original block ID used by Feishu's "copy link to block" action.
+      return markdown.replace(/^[^\n]*/, line =>
+        line + `<span class="feishu-block-anchor" id="${block.block_id}" aria-hidden="true"></span>`);
+    }
+    return markdown;
+  }
   this.indent = indent;
   this.currentBlock = block;
   const source = this.parseTextBlock(block, block.code).toString();
@@ -50,7 +63,7 @@ MarkdownRenderer.prototype.parsePageMeta = function (block) {
   return true;
 };
 
-// Use Markdown link syntax so feishu-pages can still rewrite internal destinations.
+// Leave URLs as Markdown destinations until VitePress parses their context.
 const styleTags = { bold: 'b', italic: 'em', underline: 'u', strikethrough: 'del', inline_code: 'code' };
 MarkdownRenderer.prototype.parseTextRun = function (buffer, run) {
   const style = run.text_element_style || {};
@@ -137,7 +150,8 @@ MarkdownRenderer.prototype.parseUnsupport = function (block) {
     if (typeof token !== 'string' || !/^[A-Za-z0-9_-]+_[A-Za-z0-9]+$/.test(token)) {
       throw new Error('Invalid embedded spreadsheet identifier.');
     }
-    return `<!-- feishu-embedded-sheet:${token} -->`;
+    const marker = process.env.FEISHU_SHEET_MARKER || 'feishu-embedded-sheet';
+    return `<!-- ${marker}:${token} -->`;
   }
   const type = BlockType[block.block_type] || `Block${Number(block.block_type)}`;
   if (this.unsupportedCounts) this.unsupportedCounts.set(type, (this.unsupportedCounts.get(type) || 0) + 1);

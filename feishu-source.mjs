@@ -147,8 +147,10 @@ export async function completeExport(exportDirectory, scope, environment = proce
   }
   const embeddedSheetMetadata = new Map();
   const embeddedSheetTables = new Map();
+  const sheetMarker = environment.FEISHU_SHEET_MARKER || 'feishu-embedded-sheet';
+  if (!/^[a-zA-Z0-9-]+$/.test(sheetMarker)) throw new Error('Invalid embedded sheet marker.');
   async function completeEmbeddedSheets(markdown) {
-    const markers = [...markdown.matchAll(/<!-- feishu-embedded-sheet:([^<>]*?) -->/g)];
+    const markers = [...markdown.matchAll(new RegExp(`<!-- ${sheetMarker}:([^<>]*?) -->`, 'g'))];
     for (const [marker, token] of markers) {
       const identifier = token.match(/^([A-Za-z0-9_-]+)_([A-Za-z0-9]+)$/);
       if (!identifier) throw new Error('Invalid embedded spreadsheet identifier.');
@@ -258,7 +260,7 @@ export async function completeExport(exportDirectory, scope, environment = proce
         parsed.content += '\n\n## 下级文档\n\n' + childNodes.map(child => `- [${markdownLabel(child.title)}](/articles/${child.node_token}.html)`).join('\n') + '\n';
       }
       fs.writeFileSync(destination, matter.stringify(parsed.content, parsed.data));
-      result.push({ title, filename, node_token: node.node_token, obj_type: node.obj_type, children: childNodes });
+      result.push({ title, filename, node_token: node.node_token, obj_token: node.obj_token, obj_type: node.obj_type, children: childNodes });
     }
     return result;
   }

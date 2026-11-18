@@ -7,6 +7,8 @@ export function normalizeExport(exportDirectory, source) {
   const root = path.resolve(exportDirectory, 'docs');
   const tree = JSON.parse(fs.readFileSync(path.join(exportDirectory, 'docs.json'), 'utf8'));
   const pages = [];
+  const documents = new Map();
+  const media = new Map();
   function walk(nodes, depth = 0) {
     return nodes.map(node => {
       const relative = String(node.filename || '');
@@ -27,6 +29,8 @@ export function normalizeExport(exportDirectory, source) {
       }
       const link = '/articles/' + relative.split(path.sep).join('/').replace(/\.md$/, '.html').replace(/\/index\.html$/, '/');
       const item = { text: String(node.title || node.node_token), link };
+      if (node.node_token) documents.set(node.node_token, link);
+      if (node.obj_token && !documents.has(node.obj_token)) documents.set(node.obj_token, link);
       pages.push({ ...item, depth });
       if (node.children?.length) item.items = walk(node.children, depth + 1);
       return item;
@@ -43,8 +47,18 @@ export function normalizeExport(exportDirectory, source) {
       }
     }
     rejectSymlinks(assets);
-    // feishu-pages 0.7.6 emits /assets URLs for images and attachments.
+    // The pinned exporter names downloads <token>.<ext> and boards <token>-board.<ext>.
+    for (const entry of fs.readdirSync(assets, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const token = path.parse(entry.name).name.replace(/-board$/, '');
+      media.set(token, '/assets/' + encodeURIComponent(entry.name));
+    }
     fs.cpSync(assets, path.join(source, 'public', 'assets'), { recursive: true });
   }
+  const config = path.join(source, '.vitepress');
+  fs.mkdirSync(config, { recursive: true });
+  fs.writeFileSync(path.join(config, 'feishu-links.json'), JSON.stringify({
+    documents: Object.fromEntries(documents), assets: Object.fromEntries(media),
+  }));
   return { pages, navigation };
 }

@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import path from 'node:path';
@@ -25,6 +25,9 @@ const work = fs.mkdtempSync(path.join(workRoot, 'run-'));
 const source = path.join(work, 'source');
 const articles = path.join(source, 'articles');
 const exported = path.join(work, 'export');
+// Only Sheet blocks emitted by this export may be expanded. A code example
+// can contain the very same HTML comment used in an older export.
+const sheetMarker = 'feishu-embedded-sheet-' + randomUUID();
 const release = path.join(ROOT, 'releases', `release-${Date.now()}`);
 
 function run(program, args, options = {}) {
@@ -56,6 +59,7 @@ function exportFeishu(outputDirectory, rootNodeToken) {
       OUTPUT_DIR: outputDirectory,
       BASE_URL: '/articles/',
       URL_STYLE: 'original',
+      FEISHU_SHEET_MARKER: sheetMarker,
       ROOT_NODE_TOKEN: rootNodeToken,
       NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --require=${JSON.stringify(path.join(APP, 'feishu-code-preload.cjs'))}`,
     },
@@ -89,7 +93,7 @@ try {
       exportFeishu(homeExport, scope.homeNodeToken);
       fs.cpSync(path.join(homeExport, 'docs'), path.join(exported, 'docs'), { recursive: true });
     }
-    const counts = await completeExport(exported, scope);
+    const counts = await completeExport(exported, scope, { ...process.env, FEISHU_SHEET_MARKER: sheetMarker });
     console.log(`Prepared ${counts.documents} documents, ${counts.spreadsheets} spreadsheets and ${counts.files} files (${counts.pdfs} PDFs).`);
     ({ pages: docs, navigation } = normalizeExport(exported, source));
   }

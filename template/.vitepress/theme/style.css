@@ -13,6 +13,8 @@
 }
 .vp-doc h1 { letter-spacing: .02em; line-height: 1.45; }
 .vp-doc a.header-anchor { display: none; }
+.vp-doc :is(h1, h2, h3, h4, h5, h6):has(.feishu-block-anchor) { position: relative; }
+.feishu-block-anchor { position: absolute; inset-block-start: 0; inset-inline-start: 0; }
 .vp-doc p, .vp-doc li { line-height: 1.95; }
 .VPDoc { padding-top: 56px !important; }
 
