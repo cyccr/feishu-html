@@ -1,0 +1,27 @@
+{
+  "name": "feishu-html",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "preview:build": "node preview.mjs",
+    "sync": "node publish.mjs",
+    "test": "node --test normalize-export.test.mjs publication-scope.test.mjs spreadsheet-export.test.mjs feishu-code.test.cjs share-metadata.test.mjs",
+    "preview": "vitepress preview .preview"
+  },
+  "dependencies": {
+    "feishu-pages": "0.7.6",
+    "gray-matter": "4.0.3",
+    "vitepress": "1.6.4"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "author": "cyccr",
+  "description": "Publish a Feishu Wiki as a searchable static HTML site",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cyccr/feishu-html.git"
+  }
+}

@@ -1,0 +1,12 @@
+node_modules/
+.preview/
+.env.*
+*.tar.gz
+*.zip
+work/
+qa/
+.env
+*.env
+!*.env.example
+.state.json
+*.lock-runtime

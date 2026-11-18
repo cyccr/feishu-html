@@ -1,0 +1,22 @@
+[Unit]
+Description=Export Feishu knowledge base and publish static HTML
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/feishu-publisher.env
+
+[Service]
+Type=oneshot
+User=feishu-publisher
+Group=feishu-publisher
+WorkingDirectory=/opt/feishu-publisher
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=NODE_OPTIONS=--max-old-space-size=1024
+EnvironmentFile=/etc/feishu-publisher.env
+ExecStart=/usr/bin/flock -n /opt/feishu-publisher/sync.lock-runtime /usr/bin/env node /opt/feishu-publisher/publish.mjs
+TimeoutStartSec=15min
+UMask=0022
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/feishu-publisher /var/www/feishu-docs
