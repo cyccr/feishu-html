@@ -4,6 +4,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { spawnSync } from 'node:child_process';
 import matter from 'gray-matter';
+import { parseSpreadsheetStyles, renderStyledSpreadsheet } from './spreadsheet-styles.mjs';
 
 export function resolvePublicationScope(environment) {
   const mode = environment.PUBLISH_SCOPE || 'subtree';
@@ -50,7 +51,7 @@ function cellText(value) {
   return String(value);
 }
 
-async function spreadsheetTable(spreadsheetToken, sheet, api, includeCoordinates = true) {
+async function spreadsheetTable(spreadsheetToken, sheet, api, includeCoordinates = true, styles = null) {
   const { row_count: rowCount, column_count: columnCount } = sheet.grid_properties || {};
   if (!/^[A-Za-z0-9_-]+$/.test(sheet.sheet_id) ||
       !Number.isInteger(rowCount) || rowCount < 0 || !Number.isInteger(columnCount) || columnCount < 0) {
@@ -83,6 +84,7 @@ async function spreadsheetTable(spreadsheetToken, sheet, api, includeCoordinates
     }
   }
   if (!rows.length) return '此工作表暂无内容。';
+  if (styles) return renderStyledSpreadsheet(rows, width, sheet, styles, includeCoordinates);
   const headings = Array.from({ length: width }, (_, column) => `<th scope="col">${columnLabel(column + 1)}</th>`).join('');
   const body = Array.from({ length: rows.length }, (_, row) => {
     const cells = Array.from({ length: width }, (_, column) => `<td>${html(rows[row]?.[column] || '').replace(/\r?\n/g, '<br>')}</td>`).join('');
@@ -94,13 +96,13 @@ async function spreadsheetTable(spreadsheetToken, sheet, api, includeCoordinates
   return `<table v-pre>\n${header}<tbody>\n${body}\n</tbody>\n</table>`;
 }
 
-async function spreadsheetMarkdown(node, title, api) {
+async function spreadsheetMarkdown(node, title, api, styles) {
   const metadata = await api(`sheets/v3/spreadsheets/${node.obj_token}/sheets/query`);
   if (!Array.isArray(metadata.sheets)) throw new Error('Missing spreadsheet worksheets.');
   const sections = [`# ${markdownLabel(title)}`];
   for (const sheet of metadata.sheets.sort((a, b) => a.index - b.index)) {
     sections.push(`## ${markdownLabel(sheet.title || '未命名工作表')}`);
-    sections.push(await spreadsheetTable(node.obj_token, sheet, api));
+    sections.push(await spreadsheetTable(node.obj_token, sheet, api, true, styles));
   }
   return sections.join('\n\n') + '\n';
 }
@@ -117,14 +119,19 @@ export async function completeExport(exportDirectory, scope, environment = proce
   if (auth.code !== 0 || !auth.tenant_access_token) throw new Error(`Feishu app authentication failed: ${auth.code}`);
   const headers = { Authorization: `Bearer ${auth.tenant_access_token}` };
   let lastRequest = 0;
-  async function api(endpoint, params = {}) {
+  async function api(endpoint, params = {}, body) {
     for (let attempt = 0; attempt < 4; attempt++) {
       const wait = Math.max(0, 300 - (Date.now() - lastRequest));
       if (wait) await new Promise(resolve => setTimeout(resolve, wait));
       lastRequest = Date.now();
       const url = new URL(`${base}/open-apis/${endpoint}`);
       for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== '') url.searchParams.set(key, value);
-      const response = await fetch(url, { headers, signal: AbortSignal.timeout(30000) });
+      const response = await fetch(url, {
+        method: body === undefined ? 'GET' : 'POST',
+        headers: body === undefined ? headers : { ...headers, 'Content-Type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(30000),
+      });
       const result = await response.json();
       if (response.status === 429 || result.code === 99991400) {
         await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
@@ -134,6 +141,42 @@ export async function completeExport(exportDirectory, scope, environment = proce
       return result.data;
     }
     throw new Error('Feishu API rate limit persists; existing site is preserved.');
+  }
+  const workbookStyles = new Map();
+  async function spreadsheetStyles(token) {
+    if (environment.FEISHU_SHEET_STYLES !== '1') return null;
+    if (workbookStyles.has(token)) return workbookStyles.get(token);
+    const { ticket } = await api('drive/v1/export_tasks', {}, { file_extension: 'xlsx', token, type: 'sheet' });
+    if (!/^[A-Za-z0-9_-]+$/.test(ticket || '')) throw new Error('Missing spreadsheet export ticket.');
+    let exported;
+    for (let attempt = 0; attempt < 45; attempt++) {
+      const { result } = await api(`drive/v1/export_tasks/${ticket}`, { token });
+      if (result?.job_status === 0) {
+        exported = result;
+        break;
+      }
+      if (![1, 2].includes(result?.job_status)) throw new Error('Spreadsheet style export failed.');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+    if (!/^[A-Za-z0-9_-]+$/.test(exported?.file_token || '')) throw new Error('Spreadsheet style export timed out or returned no file.');
+    const response = await fetch(`${base}/open-apis/drive/v1/export_tasks/file/${exported.file_token}/download`, {
+      headers, signal: AbortSignal.timeout(120000),
+    });
+    if (!response.ok || response.headers.get('content-type')?.includes('application/json')) {
+      throw new Error('Spreadsheet style file download failed.');
+    }
+    const chunks = [];
+    let size = 0;
+    for await (const chunk of response.body) {
+      size += chunk.length;
+      if (size > 64 * 1024 * 1024) throw new Error('Spreadsheet style file exceeds the 64 MiB processing limit.');
+      chunks.push(chunk);
+    }
+    const bytes = Buffer.concat(chunks);
+    if (bytes[0] !== 0x50 || bytes[1] !== 0x4b) throw new Error('Spreadsheet style export is not an XLSX file.');
+    const styles = await parseSpreadsheetStyles(bytes);
+    workbookStyles.set(token, styles);
+    return styles;
   }
   async function children(parent = '') {
     let page = '';
@@ -163,7 +206,8 @@ export async function completeExport(exportDirectory, scope, environment = proce
         }
         const sheet = embeddedSheetMetadata.get(spreadsheetToken).find(item => item.sheet_id === sheetId);
         if (!sheet) throw new Error('Embedded spreadsheet worksheet was not found.');
-        const table = await spreadsheetTable(spreadsheetToken, sheet, api, false);
+        const styles = await spreadsheetStyles(spreadsheetToken);
+        const table = await spreadsheetTable(spreadsheetToken, sheet, api, false, styles);
         // One HTML line preserves quote/list prefixes added by the document renderer.
         embeddedSheetTables.set(token, table.replaceAll('\n', ''));
       }
@@ -224,7 +268,7 @@ export async function completeExport(exportDirectory, scope, environment = proce
       } else if (node.obj_type === 'sheet') {
         if (!/^[A-Za-z0-9_-]+$/.test(node.obj_token)) throw new Error('Invalid spreadsheet identifier.');
         parsed = {
-          content: await spreadsheetMarkdown(node, title, api),
+          content: await spreadsheetMarkdown(node, title, api, await spreadsheetStyles(node.obj_token)),
           data: { title, description: `${title}，电子表格内容。` },
         };
         spreadsheets++;

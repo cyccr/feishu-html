@@ -36,3 +36,98 @@
 .VPSidebar .VPSidebarItem.level-1 > .items { padding-left: 12px; }
 .VPSidebar .VPSidebarItem.level-0 { padding-bottom: 0; }
 .VPSidebar .caret { align-self: center; }
+
+.feishu-sheet-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 20px 0;
+}
+.vp-doc .feishu-sheet-scroll table.feishu-sheet {
+  display: table;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin: 0;
+  color-scheme: light;
+}
+.vp-doc table.feishu-sheet tr {
+  border: 0;
+  background: transparent;
+}
+.vp-doc table.feishu-sheet td {
+  padding: 3px 6px;
+  line-height: 1.35;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.vp-doc table.feishu-sheet th {
+  background: #f2f3f5;
+  color: #555;
+  font-size: 12px;
+  font-weight: 400;
+  text-align: center;
+}
+.vp-doc table.feishu-sheet td a {
+  color: inherit;
+}
+
+button.VPSwitchAppearance.VPSwitch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background-color: var(--vp-c-bg-soft);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
+  color: var(--vp-c-text-2);
+  cursor: pointer;
+}
+button.VPSwitchAppearance.VPSwitch:hover {
+  background-color: var(--vp-c-default-soft);
+  color: var(--vp-c-text-1);
+}
+button.VPSwitchAppearance.VPSwitch:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
+}
+button.VPSwitchAppearance.VPSwitch .check {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: 16px;
+  height: 16px;
+  background: transparent;
+  box-shadow: none;
+  transform: none !important;
+  transition: none !important;
+}
+button.VPSwitchAppearance.VPSwitch .icon {
+  width: 16px;
+  height: 16px;
+}
+button.VPSwitchAppearance.VPSwitch .icon [class^='vpi-'] {
+  top: 0;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  color: inherit;
+}
+
+@media (min-width: 960px) {
+  html:not(.feishu-wide-page) .VPNavBar.has-sidebar .content-body {
+    padding-right: 24px;
+  }
+  html.feishu-wide-page { --vp-layout-max-width: 100vw; }
+  .feishu-wide-page .VPDoc .aside { display: none; }
+  html.feishu-wide-page .VPDoc .container,
+  html.feishu-wide-page .VPDoc .content,
+  html.feishu-wide-page .VPDoc.has-aside .content-container {
+    max-width: none;
+  }
+  .feishu-wide-page .VPDoc .content {
+    min-width: 0;
+    padding-right: 0;
+    padding-left: 0;
+  }
+}

@@ -108,6 +108,8 @@ try {
   hash.update(fs.readFileSync(fileURLToPath(import.meta.url)));
   hash.update(fs.readFileSync(path.join(APP, 'normalize-export.mjs')));
   hash.update(fs.readFileSync(path.join(APP, 'feishu-source.mjs')));
+  hash.update(fs.readFileSync(path.join(APP, 'spreadsheet-styles.mjs')));
+  hash.update(fs.readFileSync(path.join(APP, 'spreadsheet-styles.mjs')));
   hash.update(fs.readFileSync(path.join(APP, 'feishu-code-preload.cjs')));
   hash.update(JSON.stringify({ scope, spaceId: process.env.FEISHU_SPACE_ID, siteName: SITE_NAME }));
   hash.update(JSON.stringify(navigation));

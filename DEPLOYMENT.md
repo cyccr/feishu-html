@@ -10,7 +10,7 @@
 sudo apt-get update
 sudo apt-get install -y git nginx poppler-utils util-linux
 id feishu-publisher >/dev/null 2>&1 || sudo useradd --system --home-dir /opt/feishu-publisher --shell /usr/sbin/nologin feishu-publisher
-sudo git clone --branch v1.0.0 https://github.com/cyccr/feishu-html.git /opt/feishu-publisher
+sudo git clone --branch v1.1.0 https://github.com/cyccr/feishu-html.git /opt/feishu-publisher
 cd /opt/feishu-publisher
 sudo npm ci
 sudo install -d -o feishu-publisher -g feishu-publisher /opt/feishu-publisher/work /var/www/feishu-docs
@@ -32,6 +32,8 @@ readlink -f /var/www/feishu-docs/current
 ```
 
 成功时应看到 `Result=success`、`ExecMainStatus=0`，且 `current/index.html` 存在。若失败，通过 `journalctl -u feishu-publisher.service -n 50 --no-pager` 检查配置、飞书读取权限、Node.js 路径及 PDF 工具。发布服务按一次性任务运行，完成后状态通常为 inactive。
+
+需要保留电子表格颜色和格式时，为应用开通 `drive:export:readonly` 或 `docs:document:export`，并授予工作簿导出权限，在私密配置中设置 `FEISHU_SHEET_STYLES=1`。未启用该配置时继续发布单元格显示值。样式模式依赖锁文件中的 ExcelJS 4.4.0，更新源码后通过 `npm ci` 安装。
 
 ## 配置 Nginx 和定时同步
 

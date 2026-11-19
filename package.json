@@ -1,15 +1,16 @@
 {
   "name": "feishu-html",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "preview:build": "node preview.mjs",
     "sync": "node publish.mjs",
-    "test": "node --test normalize-export.test.mjs publication-scope.test.mjs spreadsheet-export.test.mjs feishu-code.test.cjs share-metadata.test.mjs section-links.test.mjs",
+    "test": "node --test normalize-export.test.mjs publication-scope.test.mjs spreadsheet-export.test.mjs spreadsheet-styles.test.mjs feishu-code.test.cjs share-metadata.test.mjs section-links.test.mjs",
     "preview": "vitepress preview .preview"
   },
   "dependencies": {
+    "exceljs": "4.4.0",
     "feishu-pages": "0.7.6",
     "gray-matter": "4.0.3",
     "parse5": "7.3.0",
