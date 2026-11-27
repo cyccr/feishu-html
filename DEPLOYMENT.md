@@ -10,7 +10,7 @@
 sudo apt-get update
 sudo apt-get install -y git nginx poppler-utils util-linux
 id feishu-publisher >/dev/null 2>&1 || sudo useradd --system --home-dir /opt/feishu-publisher --shell /usr/sbin/nologin feishu-publisher
-sudo git clone --branch v1.1.0 https://github.com/cyccr/feishu-html.git /opt/feishu-publisher
+sudo git clone --branch v1.2.0 https://github.com/cyccr/feishu-html.git /opt/feishu-publisher
 cd /opt/feishu-publisher
 sudo npm ci
 sudo install -d -o feishu-publisher -g feishu-publisher /opt/feishu-publisher/work /var/www/feishu-docs

@@ -63,6 +63,6 @@ npm run preview
 
 ## 版本与反馈
 
-当前发布版本为 **v1.1.0**。[版本记录](CHANGELOG.md) · [提交问题](https://github.com/cyccr/feishu-html/issues) · [MIT 许可证](LICENSE) · [第三方声明](THIRD_PARTY_NOTICES.md)
+当前发布版本为 **v1.2.0**。[版本记录](CHANGELOG.md) · [提交问题](https://github.com/cyccr/feishu-html/issues) · [MIT 许可证](LICENSE) · [第三方声明](THIRD_PARTY_NOTICES.md)
 
 报告转换问题时，附上最小脱敏样例、预期与实际效果、程序版本即可。
