@@ -96,6 +96,8 @@ try {
     const counts = await completeExport(exported, scope, { ...process.env, FEISHU_SHEET_MARKER: sheetMarker });
     console.log(`Prepared ${counts.documents} documents, ${counts.spreadsheets} spreadsheets and ${counts.files} files (${counts.pdfs} PDFs).`);
     ({ pages: docs, navigation } = normalizeExport(exported, source));
+    // This generated input is hashed alongside the articles, so a rename alone rebuilds the site.
+    fs.writeFileSync(path.join(source, '.vitepress', 'space-name.json'), JSON.stringify(counts.spaceName));
   }
 
   const hash = createHash('sha256').update(SITE.origin);

@@ -34,7 +34,11 @@ export function createDescription(markdown, title) {
     .replace(/(\*\*|__|~~)(.*?)\1/g, '$2')
     .replace(/(?<![\p{L}\p{N}_])([*_])(\S(?:.*?\S)?)\1(?![\p{L}\p{N}_])/gu, '$2')
     .replace(/`/g, '')
-    .replace(/&(amp|lt|gt|quot|apos|#39|nbsp);/g, (_, name) => entities[name])
+    .replace(/&(amp|lt|gt|quot|apos|nbsp|#\d{1,3});/g, (entity, name) => {
+      if (name[0] !== '#') return entities[name];
+      const code = Number(name.slice(1));
+      return code >= 32 && code <= 126 ? String.fromCharCode(code) : entity;
+    })
     .replace(/\s+/g, ' ')
     .trim();
   if (!text) return `${title || '文档'}的相关说明与参考资料。`;

@@ -1,5 +1,22 @@
 import ExcelJS from 'exceljs';
 import SharedStringXform from 'exceljs/lib/xlsx/xform/strings/shared-string-xform.js';
+import FontXform from 'exceljs/lib/xlsx/xform/style/font-xform.js';
+
+// ExcelJS treats a boolean font tag as enabled even when Feishu exports val="false".
+// Keep explicit false values so rich-text runs can also override their cell's font.
+const parseFontOpen = FontXform.prototype.parseOpen;
+const booleanFontTags = new Set(['b', 'i', 'strike', 'outline', 'shadow', 'condense', 'extend', 'u']);
+FontXform.prototype.parseOpen = function (node) {
+  const property = !this.parser && booleanFontTags.has(node.name) && this.map[node.name];
+  const value = String(node.attributes?.val ?? '').toLowerCase();
+  const disabled = property && (value === '0' || value === 'false' || (node.name === 'u' && value === 'none'));
+  const result = parseFontOpen.call(this, node);
+  if (disabled) {
+    this.parser.model = false;
+    this.model[property.prop] = false;
+  }
+  return result;
+};
 
 // Feishu mixes plain <t> children and rich <r> children in exported shared strings.
 // ExcelJS 4.4.0 assumes each shared string uses only one of those representations.
@@ -94,22 +111,30 @@ function colorCss(color, palette, fallback = '') {
 function fontCss(font, palette, defaults = false) {
   const styles = [];
   const family = String(font.name || '').replace(/[^\p{L}\p{N} ._-]/gu, '').slice(0, 120);
-  if (family) styles.push(`font-family:"${family}",sans-serif`);
+  if (family) {
+    const fallback = /mono|consolas|menlo|monaco|courier|cascadia/i.test(family)
+      ? 'ui-monospace,Consolas,"Liberation Mono",monospace' : 'sans-serif';
+    styles.push(`font-family:"${family}",${fallback}`);
+  }
   if (font.size || defaults) styles.push(`font-size:${positive(font.size, 11)}pt`);
   if (font.bold !== undefined || defaults) styles.push(`font-weight:${font.bold ? '700' : '400'}`);
   if (font.italic !== undefined || defaults) styles.push(`font-style:${font.italic ? 'italic' : 'normal'}`);
   const decorations = [font.underline && font.underline !== 'none' ? 'underline' : '', font.strike ? 'line-through' : ''].filter(Boolean);
-  if (decorations.length || defaults) styles.push('text-decoration:' + (decorations.join(' ') || 'none'));
+  if (decorations.length || defaults || font.underline !== undefined || font.strike !== undefined) {
+    styles.push('text-decoration:' + (decorations.join(' ') || 'none'));
+  }
   const color = colorCss(font.color, palette, defaults ? '#000000' : '');
   if (color) styles.push('color:' + color);
   return styles;
 }
 
-function cellMarkup(text, cell, palette) {
+function cellMarkup(text, cell, palette, richText) {
   let content = escapeHtml(text).replace(/\r?\n/g, '<br>');
-  const richText = cell.value?.richText;
-  if (Array.isArray(richText) && richText.map(run => run.text).join('') === text) {
-    content = richText.map(run => `<span${cssAttribute(fontCss(run.font || {}, palette))}>${escapeHtml(run.text).replace(/\r?\n/g, '<br>')}</span>`).join('');
+  if (richText) {
+    content = richText.map(run => {
+      const font = { ...cell.font, ...run.font };
+      return `<span${cssAttribute(fontCss(font, palette, true))}>${escapeHtml(run.text).replace(/\r?\n/g, '<br>')}</span>`;
+    }).join('');
   }
   const hyperlink = cell.hyperlink;
   if (typeof hyperlink === 'string' && /^(?:https?:|mailto:|tel:)/i.test(hyperlink)) {
@@ -123,8 +148,10 @@ function borderCss(border, palette) {
   return BORDER_STYLES[border.style] + ' ' + colorCss(border.color, palette, '#000000');
 }
 
-function cellCss(cell, palette, worksheet, row, column, span) {
-  const styles = fontCss(cell.font || {}, palette, true);
+function cellCss(cell, palette, worksheet, row, column, span, richText) {
+  // Decorations on the td would cross out even runs that explicitly disable them.
+  const font = richText ? { ...cell.font, underline: false, strike: false } : cell.font || {};
+  const styles = fontCss(font, palette, true);
   const fill = cell.fill;
   const background = fill?.type === 'pattern' && fill.pattern === 'solid'
     ? colorCss(fill.fgColor, palette, '#ffffff') : '#ffffff';
@@ -183,8 +210,10 @@ export function renderStyledSpreadsheet(rows, width, sheet, styles, includeCoord
     const excelWidth = worksheet.getColumn(column + 1).width || worksheet.properties.defaultColWidth;
     return excelWidth ? Math.round(excelWidth * 7 + 5) : 120;
   });
+  const responsiveDescription = !includeCoordinates && width === 2 &&
+    !positive(worksheet.getColumn(1).width, 0) && !positive(worksheet.properties.defaultColWidth, 0);
   const colgroup = (includeCoordinates ? '<col style="width:48px">' : '') + columnWidths
-    .map(value => `<col style="width:${value}px">`).join('');
+    .map((value, index) => responsiveDescription && index === 1 ? '<col>' : `<col style="width:${value}px">`).join('');
   const header = includeCoordinates ? '<thead><tr><th>行</th>' + columnWidths
     .map((_, index) => `<th>${worksheet.getColumn(index + 1).letter}</th>`).join('') + '</tr></thead>' : '';
   const body = Array.from({ length: height }, (_, row) => {
@@ -196,12 +225,16 @@ export function renderStyledSpreadsheet(rows, width, sheet, styles, includeCoord
       if (covered.has(key)) continue;
       const span = origins.get(key) || { rows: 1, columns: 1 };
       const cell = worksheet.getCell(row + 1, column + 1);
+      const text = rows[row]?.[column] || '';
+      const runs = cell.value?.richText;
+      const richText = Array.isArray(runs) && runs.map(run => run.text).join('') === text ? runs : null;
       const attributes = (span.rows > 1 ? ` rowspan="${span.rows}"` : '') + (span.columns > 1 ? ` colspan="${span.columns}"` : '');
-      const css = cellCss(cell, styles.palette, worksheet, row, column, span);
-      cells.push(`<td${attributes}${cssAttribute(css)}>${cellMarkup(rows[row]?.[column] || '', cell, styles.palette)}</td>`);
+      const css = cellCss(cell, styles.palette, worksheet, row, column, span, richText);
+      cells.push(`<td${attributes}${cssAttribute(css)}>${cellMarkup(text, cell, styles.palette, richText)}</td>`);
     }
     return `<tr style="height:${rowHeight}pt">${cells.join('')}</tr>`;
   }).join('');
   const tableWidth = columnWidths.reduce((sum, value) => sum + value, includeCoordinates ? 48 : 0);
-  return `<div class="feishu-sheet-scroll" role="region" aria-label="电子表格" tabindex="0"><table v-pre class="feishu-sheet" style="width:${tableWidth}px"><colgroup>${colgroup}</colgroup>${header}<tbody>${body}</tbody></table></div>`;
+  const tableStyle = responsiveDescription ? `width:100%;min-width:${Math.max(480, tableWidth)}px` : `width:${tableWidth}px`;
+  return `<div class="feishu-sheet-scroll" role="region" aria-label="电子表格" tabindex="0"><table v-pre class="feishu-sheet" style="${tableStyle}"><colgroup>${colgroup}</colgroup>${header}<tbody>${body}</tbody></table></div>`;
 }

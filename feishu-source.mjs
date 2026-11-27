@@ -220,6 +220,9 @@ export async function completeExport(exportDirectory, scope, environment = proce
     }
     return markdown;
   }
+  const metadata = await api(`wiki/v2/spaces/${encodeURIComponent(space)}`);
+  const spaceName = metadata?.space?.name;
+  if (typeof spaceName !== 'string' || !spaceName.trim()) throw new Error('Missing Feishu knowledge space name.');
   let roots;
   if (scope.mode === 'space') roots = await children();
   else {
@@ -283,7 +286,7 @@ export async function completeExport(exportDirectory, scope, environment = proce
           throw new Error(`File download failed (HTTP ${response.status}); check file download permissions.`);
         }
         await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(file));
-        let body = `# ${markdownLabel(title)}\n\n[打开或下载原文件](${url})\n`;
+        let body = `# ${markdownLabel(title)}\n\n<a href="${url}" download="${html(title)}">下载原文件</a>\n`;
         if (extension === '.pdf') {
           const signature = Buffer.alloc(5);
           const fd = fs.openSync(file, 'r');
@@ -310,5 +313,5 @@ export async function completeExport(exportDirectory, scope, environment = proce
   }
   const complete = await materialize(roots);
   fs.writeFileSync(path.join(exportDirectory, 'docs.json'), JSON.stringify(complete, null, 2));
-  return { documents, spreadsheets, files, pdfs };
+  return { documents, spreadsheets, files, pdfs, spaceName: spaceName.trim() };
 }

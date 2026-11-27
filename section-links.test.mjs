@@ -49,7 +49,7 @@ test('exporter links reach the exact source heading; code and assets survive the
     linkBlock('c', '外部链接', external),
     codeBlock('sample', literal, CodeLanguage.Markdown),
     { block_id: 'photo', block_type: BlockType.Image, image: { token: 'photoToken' } },
-    { block_id: 'file', block_type: BlockType.File, file: { token: 'fileToken', name: 'manual.pdf' } },
+    { block_id: 'file', block_type: BlockType.File, file: { token: 'fileToken', name: '手册 [A&B] _V1.2.pdf' } },
   ]);
   // Same calls as the CLI: first Wiki nodes, then successfully downloaded files.
   let source = exporterUtils.replaceLinks(original, 'targetNode', '/articles/targetNode');
@@ -85,6 +85,9 @@ test('exporter links reach the exact source heading; code and assets survive the
   assert.equal(guide.querySelector('pre code').textContent, literal);
   assert.equal(guide.querySelector('img').getAttribute('src'), '/assets/photoToken.png');
   assert.ok(links.includes('/assets/fileToken.pdf'));
+  const attachment = guide.querySelector('a[href="/assets/fileToken.pdf"]');
+  assert.equal(attachment.download, '手册 [A&B] _V1.2.pdf');
+  assert.equal(attachment.textContent, attachment.download);
 
   const mixed = render([
     '<table><tr><td><a href="' + url + '">参数</a><code>&lt;img src="photoToken"&gt;</code></td></tr></table>',

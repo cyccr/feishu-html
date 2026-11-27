@@ -25,7 +25,7 @@ test('a separate space homepage is explicit and cannot change subtree publicatio
   });
 });
 
-function spaceFixture(t, homeSpace = 'space') {
+function spaceFixture(t, homeSpace = 'space', metadata = { name: 'SDK 知识库' }) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'feishu-space-test-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const exported = path.join(root, 'export');
@@ -39,7 +39,9 @@ function spaceFixture(t, homeSpace = 'space') {
       return Response.json({ code: 0, tenant_access_token: 'test-token' });
     }
     let data;
-    if (url.pathname.endsWith('/get_node')) {
+    if (url.pathname === '/open-apis/wiki/v2/spaces/space') {
+      data = { space: metadata };
+    } else if (url.pathname.endsWith('/get_node')) {
       data = { node: { node_token: 'home', title: '知识库首页', obj_type: 'docx', space_id: homeSpace, has_child: false } };
     } else {
       const category = { node_token: 'category', title: '分类', obj_type: 'docx', has_child: true };
@@ -55,6 +57,7 @@ test('a space homepage with has_child false still publishes the complete directo
   const { root, exported, environment } = spaceFixture(t);
   const counts = await completeExport(exported, { mode: 'space', rootNodeToken: '', homeNodeToken: 'home' }, environment);
   assert.equal(counts.documents, 3);
+  assert.equal(counts.spaceName, 'SDK 知识库');
   const tree = JSON.parse(fs.readFileSync(path.join(exported, 'docs.json'), 'utf8'));
   assert.equal(tree[0].node_token, 'home');
   assert.equal(tree[0].children[0].node_token, 'category');
@@ -67,5 +70,22 @@ test('a space homepage with has_child false still publishes the complete directo
 test('a homepage from a different space cannot be added to a whole-space export', async t => {
   const { exported, environment } = spaceFixture(t, 'another-space');
   await assert.rejects(completeExport(exported, { mode: 'space', rootNodeToken: '', homeNodeToken: 'home' }, environment), /homepage belongs to a different knowledge base/);
+  assert.equal(fs.existsSync(path.join(exported, 'docs.json')), false);
+});
+
+test('a subtree picks up a space rename with an unchanged homepage', async t => {
+  const metadata = { name: 'SDK 旧库名' };
+  const { exported, environment } = spaceFixture(t, 'space', metadata);
+  const scope = { mode: 'subtree', rootNodeToken: 'home' };
+  assert.equal((await completeExport(exported, scope, environment)).spaceName, metadata.name);
+  const article = fs.readFileSync(path.join(exported, 'docs', 'home.md'), 'utf8');
+  metadata.name = '研发 & <SDK>';
+  assert.equal((await completeExport(exported, scope, environment)).spaceName, metadata.name);
+  assert.equal(fs.readFileSync(path.join(exported, 'docs', 'home.md'), 'utf8'), article);
+});
+
+test('an empty knowledge space name aborts the export', async t => {
+  const { exported, environment } = spaceFixture(t, 'space', { name: '  ' });
+  await assert.rejects(completeExport(exported, { mode: 'space' }, environment), /Missing Feishu knowledge space name/);
   assert.equal(fs.existsSync(path.join(exported, 'docs.json')), false);
 });

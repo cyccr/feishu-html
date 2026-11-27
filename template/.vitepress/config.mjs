@@ -3,16 +3,26 @@ import fs from 'node:fs';
 import { createShareHead, ICON_VERSION, SITE_NAME } from './share-metadata.mjs';
 import { preserveCodeWhitespace } from './code-whitespace.mjs';
 import { installFeishuLinks } from './feishu-links.mjs';
+import { docsMiniSearch } from './search-tokens.mjs';
 
 const docs = JSON.parse(fs.readFileSync(new URL('./sidebar.json', import.meta.url), 'utf8'));
 const links = JSON.parse(fs.readFileSync(new URL('./feishu-links.json', import.meta.url), 'utf8'));
 const origin = new URL(process.env.SITE_URL || 'http://localhost:4173').origin;
 
+function escapeLabel(text) {
+  return text.replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[character]);
+}
+
+const spaceNameFile = new URL('./space-name.json', import.meta.url);
+const navTitle = fs.existsSync(spaceNameFile)
+  ? JSON.parse(fs.readFileSync(spaceNameFile, 'utf8'))
+  : SITE_NAME; // Offline preview
+
 function sidebarItems(items) {
   return items.map(item => {
-    const label = String(item.text || '').replace(/[&<>"']/g, character => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-    })[character]);
+    const label = escapeLabel(String(item.text || ''));
     const entry = { ...item, text: `<span class="sidebar-label" title="${label}">${label}</span>` };
     if (item.items?.length) {
       entry.items = sidebarItems(item.items);
@@ -43,6 +53,7 @@ export default defineConfig({
   lastUpdated: false,
   sitemap: { hostname: origin },
   head: [
+    ...(docs.length ? [['script', { id: 'feishu-search-entry' }, fs.readFileSync(new URL('./search-entry.js', import.meta.url), 'utf8')]] : []),
     ['meta', { name: 'theme-color', content: '#285b51' }],
     ['link', { rel: 'icon', type: 'image/x-icon', href: `/favicon.ico?v=${ICON_VERSION}` }],
     ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: `/favicon-32.png?v=${ICON_VERSION}` }],
@@ -52,10 +63,17 @@ export default defineConfig({
     return createShareHead(pageData, origin);
   },
   themeConfig: {
-    siteTitle: SITE_NAME,
+    siteTitle: escapeLabel(navTitle),
     nav: [{ text: '首页', link: '/' }],
     sidebar: navigation.length ? [{ items: sidebarItems(navigation) }] : [],
-    search: docs.length ? { provider: 'local', options: { translations: { button: { buttonText: '搜索文档', buttonAriaLabel: '搜索文档' } } } } : undefined,
+    search: docs.length ? {
+      provider: 'local',
+      options: {
+        detailedView: true,
+        miniSearch: docsMiniSearch,
+        translations: { button: { buttonText: '搜索文档', buttonAriaLabel: '搜索文档' } },
+      },
+    } : undefined,
     outline: { label: '本页目录', level: [2, 3] },
     docFooter: { prev: '上一篇', next: '下一篇' },
     returnToTopLabel: '返回顶部',

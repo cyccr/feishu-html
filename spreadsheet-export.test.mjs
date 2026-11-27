@@ -18,6 +18,7 @@ function fixture(t, readValues) {
     const url = new URL(input);
     requests.push(url);
     let data;
+    if (url.pathname === '/open-apis/wiki/v2/spaces/test-space') return Response.json({ code: 0, data: { space: { name: '测试库' } } });
     if (url.pathname.endsWith('/tenant_access_token/internal')) {
       return Response.json({ code: 0, tenant_access_token: 'test-token' });
     }
@@ -52,7 +53,7 @@ test('a new spreadsheet publishes alongside existing documents and reads every g
     return { valueRange: { values } };
   });
   const counts = await completeExport(exported, { mode: 'space', rootNodeToken: '' }, environment);
-  assert.deepEqual(counts, { documents: 1, spreadsheets: 1, files: 0, pdfs: 0 });
+  assert.deepEqual(counts, { documents: 1, spreadsheets: 1, files: 0, pdfs: 0, spaceName: '测试库' });
   const markdown = fs.readFileSync(path.join(exported, 'docs', 'spreadsheet.md'), 'utf8');
   assert.match(markdown, /title: 未命名表格/);
   assert.match(markdown, /<table v-pre>/);
@@ -99,6 +100,8 @@ function embeddedFixture(t, options = {}) {
     let data;
     if (url.pathname.endsWith('/nodes')) {
       data = { items: [{ node_token: 'article', obj_type: 'docx', title: '文章' }] };
+    } else if (url.pathname === '/open-apis/wiki/v2/spaces/space') {
+      data = { space: { name: '测试库' } };
     } else if (url.pathname.endsWith('/sheets/query')) {
       const sheetIds = options.missingSheet ? ['first'] : ['first', 'second', 'unreferenced'];
       data = { sheets: sheetIds.map(sheet_id => ({
@@ -121,7 +124,7 @@ function embeddedFixture(t, options = {}) {
 test('embedded worksheets publish at their original positions with rich text, escaping and repeated references', async t => {
   const { root, exported, document, requests, environment } = embeddedFixture(t);
   const counts = await completeExport(exported, { mode: 'space' }, environment);
-  assert.deepEqual(counts, { documents: 1, spreadsheets: 0, files: 0, pdfs: 0 });
+  assert.deepEqual(counts, { documents: 1, spreadsheets: 0, files: 0, pdfs: 0, spaceName: '测试库' });
   const markdown = fs.readFileSync(document, 'utf8');
   assert.match(markdown, /\| 保留 \| 原内容 \|/);
   assert.match(markdown, /第一张表\n+<table v-pre>[\s\S]*蓝牙设备[\s\S]*第二张表\n+<table v-pre>/);

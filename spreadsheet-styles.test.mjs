@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { parseFragment } from 'parse5';
 import ExcelJS from 'exceljs';
 import { parseSpreadsheetStyles, renderStyledSpreadsheet } from './spreadsheet-styles.mjs';
 import { completeExport } from './feishu-source.mjs';
@@ -118,6 +119,87 @@ test('Feishu shared strings can mix empty or nonempty plain text with styled run
   assert.match(html, /font-style:italic[^>]*>body/);
 });
 
+test('explicit false font tags stay disabled and rich-text overrides do not inherit cell decorations', async () => {
+  const require = createRequire(import.meta.url);
+  const requireExcel = createRequire(require.resolve('exceljs'));
+  const JSZip = requireExcel('jszip');
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Flags');
+  sheet.getCell('A1').value = 'plain cell';
+  sheet.getCell('A1').font = { name: 'DisabledCell', bold: true, italic: true, strike: true, underline: true };
+  sheet.getCell('A2').value = 'styled cell';
+  sheet.getCell('A2').font = { name: 'EnabledCell', bold: true, italic: true, strike: true, underline: true };
+  sheet.getCell('A3').font = { name: 'CellBase', bold: true, italic: true, strike: true, underline: true };
+  sheet.getCell('A3').value = { richText: [
+    { text: 'examples/device_profile/', font: { name: 'SFMono-Regular', bold: true, italic: true, strike: true, underline: true } },
+    { text: ' genuine', font: { name: 'EnabledRun', bold: true, italic: true, strike: true, underline: true } },
+  ] };
+  const zip = await JSZip.loadAsync(await workbook.xlsx.writeBuffer());
+  let fonts = await zip.file('xl/styles.xml').async('string');
+  fonts = fonts.replace(/<font>[\s\S]*?<\/font>/g, font => {
+    if (font.includes('DisabledCell')) {
+      return font.replace('<b/>', '<b val="0"/>').replace('<i/>', '<i val="false"/>')
+        .replace('<strike/>', '<strike val="0"/>').replace('<u/>', '<u val="none"/>');
+    }
+    if (font.includes('EnabledCell')) {
+      return font.replace('<b/>', '<b val="1"/>').replace('<i/>', '<i val="true"/>');
+    }
+    return font;
+  });
+  let strings = await zip.file('xl/sharedStrings.xml').async('string');
+  strings = strings.replace(/<rPr>[\s\S]*?<\/rPr>/g, font => font.includes('SFMono-Regular')
+    ? font.replace('<b/>', '<b val="false"/>').replace('<i/>', '<i val="0"/>')
+      .replace('<strike/>', '<strike val="false"/>').replace('<u/>', '<u val="0"/>')
+    : font);
+  zip.file('xl/styles.xml', fonts);
+  zip.file('xl/sharedStrings.xml', strings);
+  const styles = await parseSpreadsheetStyles(await zip.generateAsync({ type: 'nodebuffer' }));
+  const parsed = styles.workbook.getWorksheet('Flags');
+  for (const property of ['bold', 'italic', 'strike', 'underline']) {
+    assert.equal(parsed.getCell('A1').font[property], false, property);
+    assert.equal(parsed.getCell('A3').value.richText[0].font[property], false, property);
+  }
+  assert.equal(parsed.getCell('A2').font.bold, true);
+  assert.equal(parsed.getCell('A2').font.italic, true);
+  const html = renderStyledSpreadsheet([['plain cell'], ['styled cell'], ['examples/device_profile/ genuine']], 1,
+    { title: 'Flags', grid_properties: { row_count: 3, column_count: 1 } }, styles, false);
+  const cells = [];
+  function visit(node) {
+    if (node.tagName === 'td') cells.push(node);
+    for (const child of node.childNodes || []) visit(child);
+  }
+  visit(parseFragment(html));
+  const styleOf = node => node.attrs.find(attribute => attribute.name === 'style').value;
+  assert.match(styleOf(cells[0]), /font-weight:400;font-style:normal;text-decoration:none/);
+  assert.match(styleOf(cells[1]), /font-weight:700;font-style:italic;text-decoration:underline line-through/);
+  assert.match(styleOf(cells[2]), /text-decoration:none/);
+  const spans = cells[2].childNodes.filter(node => node.tagName === 'span');
+  assert.match(styleOf(spans[0]), /font-weight:400;font-style:normal;text-decoration:none/);
+  assert.match(styleOf(spans[0]), /Consolas[\s\S]*monospace/);
+  assert.match(styleOf(spans[1]), /font-weight:700;font-style:italic;text-decoration:underline line-through/);
+});
+
+test('embedded description columns use available width when the label column has no exported size', async () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Description');
+  sheet.getColumn(2).width = 30;
+  sheet.getCell('A1').value = '项目';
+  sheet.getCell('B1').value = '说明';
+  const styles = await parseSpreadsheetStyles(await workbook.xlsx.writeBuffer());
+  const metadata = { title: 'Description', grid_properties: { row_count: 2, column_count: 2 } };
+  const values = [['项目', '说明'], ['示例应用', 'examples/device_profile/']];
+  const html = renderStyledSpreadsheet(values, 2, metadata, styles, false);
+  assert.match(html, /style="width:100%;min-width:480px"/);
+  assert.match(html, /<colgroup><col style="width:120px"><col><\/colgroup>/);
+  assert.match(html, /class="feishu-sheet-scroll"/);
+  const standalone = renderStyledSpreadsheet(values, 2, metadata, styles, true);
+  assert.equal(standalone.includes('width:100%'), false);
+  styles.workbook.getWorksheet('Description').getColumn(1).width = 18;
+  const explicitWidths = renderStyledSpreadsheet(values, 2, metadata, styles, false);
+  assert.equal(explicitWidths.includes('width:100%'), false);
+  assert.match(explicitWidths, /<col style="width:131px">/);
+});
+
 async function exportFixture(t, options = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'feishu-styled-export-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -131,6 +213,7 @@ async function exportFixture(t, options = {}) {
   t.mock.method(globalThis, 'fetch', async (input, request = {}) => {
     const url = new URL(input);
     requests.push({ url, request });
+    if (url.pathname === '/open-apis/wiki/v2/spaces/space') return Response.json({ code: 0, data: { space: { name: '测试库' } } });
     if (url.pathname.endsWith('/tenant_access_token/internal')) return Response.json({ code: 0, tenant_access_token: 'token' });
     if (url.pathname.endsWith('/nodes')) return Response.json({ code: 0, data: { items: [{ node_token: 'article', obj_type: 'docx', title: '测试' }] } });
     if (url.pathname.endsWith('/sheets/query')) return Response.json({ code: 0, data: { sheets: [selectedSheet] } });

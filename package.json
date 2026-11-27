@@ -6,7 +6,7 @@
   "scripts": {
     "preview:build": "node preview.mjs",
     "sync": "node publish.mjs",
-    "test": "node --test normalize-export.test.mjs publication-scope.test.mjs spreadsheet-export.test.mjs spreadsheet-styles.test.mjs feishu-code.test.cjs share-metadata.test.mjs section-links.test.mjs",
+    "test": "node --test normalize-export.test.mjs publication-scope.test.mjs spreadsheet-export.test.mjs spreadsheet-styles.test.mjs feishu-code.test.cjs share-metadata.test.mjs section-links.test.mjs search-entry.test.mjs search-tokens.test.mjs",
     "preview": "vitepress preview .preview"
   },
   "dependencies": {

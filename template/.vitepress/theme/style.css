@@ -12,11 +12,65 @@
   --vp-sidebar-bg-color: #191e1c;
 }
 .vp-doc h1 { letter-spacing: .02em; line-height: 1.45; }
+.vp-doc a[href] { text-decoration-line: none; }
 .vp-doc a.header-anchor { display: none; }
 .vp-doc :is(h1, h2, h3, h4, h5, h6):has(.feishu-block-anchor) { position: relative; }
 .feishu-block-anchor { position: absolute; inset-block-start: 0; inset-inline-start: 0; }
 .vp-doc p, .vp-doc li { line-height: 1.95; }
+.vp-doc p.feishu-empty-paragraph { margin: 0; }
+.feishu-text-red { color: #c02a32; }
+.feishu-text-orange { color: #a24a0b; }
+.feishu-text-yellow { color: #826600; }
+.feishu-text-green { color: #237b49; }
+.feishu-text-blue { color: #245bdb; }
+.feishu-text-purple { color: #7f3bf5; }
+.feishu-text-gray { color: #646a73; }
+.dark .feishu-text-red { color: #ff9299; }
+.dark .feishu-text-orange { color: #ffad70; }
+.dark .feishu-text-yellow { color: #e6c35d; }
+.dark .feishu-text-green { color: #70d59b; }
+.dark .feishu-text-blue { color: #8fb2ff; }
+.dark .feishu-text-purple { color: #c39bff; }
+.dark .feishu-text-gray { color: #afb3bc; }
 .VPDoc { padding-top: 56px !important; }
+
+.VPLocalSearchBox .result .titles > .title-icon { display: none; }
+.VPLocalSearchBox .result .excerpt {
+  font-size: .8rem;
+  max-height: 2.6em;
+}
+
+html[data-search-opening] #local-search .DocSearch-Search-Icon {
+  mask-image: none;
+  background: transparent;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: feishu-search-spin .8s linear infinite;
+}
+@keyframes feishu-search-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-search-opening] #local-search .DocSearch-Search-Icon { animation: none; }
+}
+.feishu-search-error {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  padding: 8px 12px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+}
+.feishu-search-error button {
+  margin-left: 12px;
+  color: var(--vp-c-brand-1);
+  text-decoration: underline;
+}
 
 .VPSidebar .VPSidebarItem .link { min-width: 0; }
 .VPSidebar .VPSidebarItem .text {
@@ -36,6 +90,39 @@
 .VPSidebar .VPSidebarItem.level-1 > .items { padding-left: 12px; }
 .VPSidebar .VPSidebarItem.level-0 { padding-bottom: 0; }
 .VPSidebar .caret { align-self: center; }
+
+/* Feishu Docx Table blocks. Embedded Sheet blocks keep their own layout. */
+.feishu-doc-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 16px 0;
+}
+.vp-doc .feishu-doc-table-scroll > .feishu-doc-table {
+  display: table;
+  table-layout: fixed;
+  width: 100%;
+  max-width: var(--table-width);
+  min-width: var(--table-min);
+  border-collapse: collapse;
+  margin: 0;
+}
+.vp-doc .feishu-doc-table > :is(thead, tbody) > tr {
+  background: var(--vp-c-bg);
+}
+.vp-doc .feishu-doc-table > :is(thead, tbody) > tr > :is(td, th) {
+  vertical-align: middle;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+  padding: 8px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.vp-doc .feishu-doc-table > :is(thead, tbody) > tr > :is(td, th) > :is(p, ul, ol),
+.vp-doc .feishu-cell-text > :is(p, ul, ol) {
+  margin-block: 0;
+  line-height: inherit;
+}
 
 .feishu-sheet-scroll {
   max-width: 100%;
